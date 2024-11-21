@@ -1,4 +1,4 @@
-workflow_basic_path <- "https://raw.githubusercontent.com/FaaSr/FaaSr-package/main/schema/workflow_template.yml"
+workflow_basic_path <- "https://raw.githubusercontent.com/FaaSr/FaaSr-package/main/schema/workflow_template_1.4.0.yml"
 workflow_timer_path <- "https://raw.githubusercontent.com/FaaSr/FaaSr-package/main/schema/workflow_with_cron_template.yml"
 #TBD. workflow_runner_path <- ""
 #TBD. workflow_runner_w_timer_path <- ""
