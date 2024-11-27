@@ -46,19 +46,27 @@ faasr_s3_check <- function(faasr){
 	    region=faasr$DataStores[[server]]$Region
 	  )
     )
-    check <- try(s3$list_buckets(), silent=TRUE)
-    if(is.list(check)){
-      bucket_names <- lapply(check$Buckets, function(bucket) bucket$Name)
-      if(!(faasr$DataStores[[server]]$Bucket %in% bucket_names)){
-        msg <- paste0('{\"faasr_s3_check\":\"S3 server ',server,' failed with message: No such bucket\"}', "\n")
-        message(msg)
-        stop()
+
+    bucket_exists <- tryCatch({
+    s3$head_bucket(Bucket = faasr$DataStores[[server]]$Bucket)
+      TRUE
+    }, error = function(e) {
+      # Check if the error is due to bucket non-existence or access issues
+      if (grepl("404|403", conditionMessage(e))) {
+        FALSE
+      } else {
+        # Rethrow unexpected errors
+        stop(e)
       }
-    }else{
-      msg <- paste0('{\"faasr_s3_check\":\"S3 server ',server,' failed with message: Data store server unreachable\"}', "\n")
+    })
+    
+    # Handle bucket non-existence
+    if (!bucket_exists) {
+      msg <- paste0('{\"faasr_s3_check\":\"S3 server ',server,' failed with message: No such bucket or access denied\"}', "\n")
       message(msg)
       stop()
     }
+  
   }
   return(faasr)
 }
