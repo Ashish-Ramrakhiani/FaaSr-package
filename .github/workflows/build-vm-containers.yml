@@ -1,0 +1,56 @@
+name: Build VM-Enabled FaaSr Containers
+
+on:
+  workflow_dispatch:  # Manual trigger
+  push:
+    branches: [ main ]  # Or your specific branch
+    paths:
+      - 'schema/**'  # Rebuild when schema changes
+      - 'R/**'       # Rebuild when R code changes
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v2
+
+      - name: Login to GitHub Container Registry
+        uses: docker/login-action@v2
+        with:
+          registry: ghcr.io
+          username: ${{ github.repository_owner }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push tidyverse container
+        uses: docker/build-push-action@v4
+        with:
+          context: .
+          file: ./docker/github-actions-tidyverse/Dockerfile
+          push: true
+          tags: ghcr.io/${{ github.repository_owner }}/github-actions-tidyverse:vm-support
+
+      - name: Create AWS Dockerfile
+        run: |
+          mkdir -p docker/github-actions-aws
+          cat > docker/github-actions-aws/Dockerfile << 'EOF'
+          FROM ghcr.io/${{ github.repository_owner }}/github-actions-tidyverse:vm-support
+          
+          # Install AWS SDK for R
+          RUN R -e "install.packages(c('paws', 'paws.compute', 'paws.security.identity', 'paws.storage', 'httr', 'jsonlite', 'base64enc'), repos='https://cloud.r-project.org')"
+          EOF
+
+      - name: Build and push AWS container
+        uses: docker/build-push-action@v4
+        with:
+          context: .
+          file: ./docker/github-actions-aws/Dockerfile
+          push: true
+          tags: ghcr.io/${{ github.repository_owner }}/github-actions-aws:vm-support
