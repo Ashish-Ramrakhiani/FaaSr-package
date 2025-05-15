@@ -4,10 +4,12 @@
 \alias{faasr_register_workflow}
 \title{faasr_register_workflow}
 \usage{
-faasr_register_workflow(...)
+faasr_register_workflow(..., vm_strategy = "basic")
 }
 \arguments{
 \item{...}{inputs for timeout, cron, and memory}
+
+\item{vm_strategy}{Strategy to use for resource-intensive functions ("basic" by default)}
 }
 \value{
 return nothing / executes the FaaS

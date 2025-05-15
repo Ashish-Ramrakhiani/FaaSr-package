@@ -17,8 +17,8 @@ basic_ld_image_tag <- ".amazonaws.com/aws-lambda-tidyverse:latest"
 #' This aggregates openwhisk, github actions and lambda's
 #' register functions
 #' @param ... inputs for timeout, cron, and memory
+#' @param vm_strategy Strategy to use for resource-intensive functions ("basic" by default)
 #' @import cli
-#' @import httr
 #' @return return nothing / executes the FaaS
 #' @export 
 #' @examples
