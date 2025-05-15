@@ -28,8 +28,7 @@ basic_ld_image_tag <- ".amazonaws.com/aws-lambda-tidyverse:latest"
 #' }
 
 # faasr_register_workflow function
-faasr_register_workflow <- function(...){
-
+faasr_register_workflow <- function(..., vm_strategy="basic"){
   # get the "svc" by using "faasr_get_svc" and define the required variables.
   svc <- .faasr_get_svc()
   faasr_wd <- svc$wd
@@ -41,12 +40,29 @@ faasr_register_workflow <- function(...){
   cred <- svc$cred
   
   setwd(faasr_wd)
-
+  
+  # Check if any functions are resource-intensive
+  has_ri_functions <- FALSE
+  for (func_name in names(faasr$FunctionList)) {
+    if (!is.null(faasr$FunctionList[[func_name]]$ResourceIntensive) && 
+        ((is.logical(faasr$FunctionList[[func_name]]$ResourceIntensive) && 
+          faasr$FunctionList[[func_name]]$ResourceIntensive == TRUE) || 
+         is.list(faasr$FunctionList[[func_name]]$ResourceIntensive))) {
+      has_ri_functions <- TRUE
+      break
+    }
+  }
+  
+  # If there are resource-intensive functions, apply the VM strategy
+  if (has_ri_functions) {
+    cli_alert_info("Resource-intensive functions detected. Applying VM strategy.")
+    faasr <- faasr_vm_strategy(faasr, vm_strategy)
+  }
+  
   # register actions for openwhisk/github-actions/lambda by given json
   check <- faasr_register_workflow_openwhisk(faasr,cred,...)
   check <- faasr_register_workflow_github_actions(faasr,cred)
   check <- faasr_register_workflow_aws_lambda(faasr,cred,...)
-  
 }
 .faasr_user$operations$register_workflow <- faasr_register_workflow
 
@@ -120,6 +136,42 @@ faasr_collect_sys_env <- function(faasr, cred){
     # if "cred" doesn't have a value, use "Sys.getenv" to get the real key.
     # if "Sys.getenv" value is empty, return an error message
     } else if (faasr$ComputeServers[[faas_cred]]$FaaSType=="Lambda"){
+      cred_name_ac <- faasr$ComputeServers[[faas_cred]]$AccessKey
+      if (is.null(cred_name_ac)){
+        cred_name_ac <- paste0(faas_cred, "_ACCESS_KEY")
+      }
+      if (is.null(cred[[cred_name_ac]])){
+        real_cred <- Sys.getenv(cred_name_ac)
+        if (real_cred == ""){
+          ask_cred <- askpass::askpass(paste0("Enter keys for ", cred_name_ac))
+          ask_cred_list <- list(ask_cred)
+          names(ask_cred_list) <- cred_name_ac
+          do.call(Sys.setenv, ask_cred_list)
+          cred[[cred_name_ac]] <- ask_cred
+        } else{
+          cred[[cred_name_ac]] <- real_cred
+        }
+      }
+      
+      cred_name_sc <- faasr$ComputeServers[[faas_cred]]$SecretKey
+      if (is.null(cred_name_sc)){
+        cred_name_sc <- paste0(faas_cred, "_SECRET_KEY")
+      }
+      if (is.null(cred[[cred_name_sc]])){
+        real_cred <- Sys.getenv(cred_name_sc)
+        if (real_cred == ""){
+          ask_cred <- askpass::askpass(paste0("Enter keys for ", cred_name_sc))
+          ask_cred_list <- list(ask_cred)
+          names(ask_cred_list) <- cred_name_sc
+          do.call(Sys.setenv, ask_cred_list)
+          cred[[cred_name_sc]] <- ask_cred
+        } else{
+          cred[[cred_name_sc]] <- real_cred
+        }
+      }
+    }
+    # Add new case for VM servers
+    else if (faasr$ComputeServers[[faas_cred]]$FaaSType=="VM"){
       cred_name_ac <- faasr$ComputeServers[[faas_cred]]$AccessKey
       if (is.null(cred_name_ac)){
         cred_name_ac <- paste0(faas_cred, "_ACCESS_KEY")
@@ -301,6 +353,23 @@ faasr <- function(json_path=NULL, env_path=NULL){
                 }
               }
               svc$json$ComputeServers[[faas_js]]$API.key <- paste0(faas_js,"_API_KEY")
+            },
+            
+            # Add new case for VM
+            "VM"={
+              if (!is.null(svc$json$ComputeServers[[faas_js]]$AccessKey)){
+                if (svc$json$ComputeServers[[faas_js]]$AccessKey != paste0(faas_js,"_ACCESS_KEY")){
+                  svc$cred[[paste0(faas_js,"_ACCESS_KEY")]] <- svc$json$ComputeServers[[faas_js]]$AccessKey
+                }
+              }
+              svc$json$ComputeServers[[faas_js]]$AccessKey <- paste0(faas_js,"_ACCESS_KEY")
+              
+              if (!is.null(svc$json$ComputeServers[[faas_js]]$SecretKey)){
+                if (svc$json$ComputeServers[[faas_js]]$SecretKey != paste0(faas_js,"_SECRET_KEY")){
+                  svc$cred[[paste0(faas_js,"_SECRET_KEY")]] <- svc$json$ComputeServers[[faas_js]]$SecretKey
+                }
+              }
+              svc$json$ComputeServers[[faas_js]]$SecretKey <- paste0(faas_js,"_SECRET_KEY")
             }
     )
   }
@@ -946,3 +1015,239 @@ faasr_get_storage_instance <- function(faasr, cred){
   storage_info$s3 <- s3
   return (storage_info)
 }
+
+#' @title faasr_preview_vm_strategy
+#' @description 
+#' Preview how VM strategy would transform a workflow without registering it
+#' @param vm_strategy Strategy to use
+#' @return Transformed workflow
+#' @export
+faasr_preview_vm_strategy <- function(vm_strategy="basic") {
+  # Get current workflow
+  svc <- .faasr_get_svc()
+  faasr <- svc$json
+  
+  # Apply VM strategy
+  transformed_faasr <- faasr_vm_strategy(faasr, vm_strategy)
+  
+  # Compare original and transformed workflows
+  cli_alert_info("Original workflow:")
+  cli_ol()
+  cli_li(paste0("Entry point: ", faasr$FunctionInvoke))
+  workflow_path <- c(faasr$FunctionInvoke)
+  current <- faasr$FunctionInvoke
+  while (!is.null(faasr$FunctionList[[current]]$InvokeNext) && length(faasr$FunctionList[[current]]$InvokeNext) > 0) {
+    if (is.character(faasr$FunctionList[[current]]$InvokeNext)) {
+      current <- faasr$FunctionList[[current]]$InvokeNext
+      workflow_path <- c(workflow_path, current)
+    } else {
+      # Handle array of next functions
+      for (next_func in faasr$FunctionList[[current]]$InvokeNext) {
+        workflow_path <- c(workflow_path, next_func)
+      }
+      break
+    }
+  }
+  for (func in workflow_path) {
+    cli_li(paste0(func, " (", faasr$FunctionList[[func]]$FaaSServer, ")"))
+    if (!is.null(faasr$FunctionList[[func]]$ResourceIntensive) && 
+        faasr$FunctionList[[func]]$ResourceIntensive == TRUE) {
+      cli_li("  Resource-intensive: YES")
+    }
+  }
+  cli_end()
+  
+  cli_alert_info("Transformed workflow:")
+  cli_ol()
+  cli_li(paste0("Entry point: ", transformed_faasr$FunctionInvoke))
+  workflow_path <- c(transformed_faasr$FunctionInvoke)
+  current <- transformed_faasr$FunctionInvoke
+  while (!is.null(transformed_faasr$FunctionList[[current]]$InvokeNext) && 
+         length(transformed_faasr$FunctionList[[current]]$InvokeNext) > 0) {
+    if (is.character(transformed_faasr$FunctionList[[current]]$InvokeNext)) {
+      current <- transformed_faasr$FunctionList[[current]]$InvokeNext
+      workflow_path <- c(workflow_path, current)
+    } else {
+      # Handle array of next functions
+      for (next_func in transformed_faasr$FunctionList[[current]]$InvokeNext) {
+        workflow_path <- c(workflow_path, next_func)
+      }
+      break
+    }
+  }
+  for (func in workflow_path) {
+    cli_li(paste0(func, " (", transformed_faasr$FunctionList[[func]]$FaaSServer, ")"))
+    if (!is.null(transformed_faasr$FunctionList[[func]]$ResourceIntensive) && 
+        transformed_faasr$FunctionList[[func]]$ResourceIntensive == TRUE) {
+      cli_li("  Resource-intensive: YES")
+    }
+  }
+  cli_end()
+  
+  return(transformed_faasr)
+}
+
+#' @title faasr_start_vm
+#' @description 
+#' Manually start the VM
+#' @param instance_id Optional instance ID override
+#' @param region Optional region override
+#' @return VM information
+#' @export
+faasr_start_vm <- function(instance_id=NULL, region=NULL) {
+  # Get configuration
+  svc <- .faasr_get_svc()
+  faasr <- svc$json
+  cred <- faasr_collect_sys_env(faasr, svc$cred)
+  faasr <- faasr_replace_values(faasr, cred)
+  
+  # Find the VM server
+  vm_server_name <- NULL
+  for (server_name in names(faasr$ComputeServers)) {
+    if (faasr$ComputeServers[[server_name]]$FaaSType == "VM") {
+      vm_server_name <- server_name
+      break
+    }
+  }
+  
+  if (is.null(vm_server_name)) {
+    cli_alert_danger("No VM server defined in configuration")
+    return(NULL)
+  }
+  
+  # Get VM configuration
+  vm_config <- faasr$ComputeServers[[vm_server_name]]
+  
+  # Get instance details
+  if (is.null(instance_id)) {
+    instance_id <- vm_config$InstanceId
+  }
+  
+  if (is.null(region)) {
+    region <- vm_config$Region
+  }
+  
+  # Create EC2 client
+  ec2 <- paws.compute::ec2(
+    config = list(
+      credentials = list(
+        creds = list(
+          access_key_id = vm_config$AccessKey,
+          secret_key = vm_config$SecretKey
+        )
+      ),
+      region = region
+    )
+  )
+  
+  # Start instance
+  cli_alert_info(paste0("Starting EC2 instance: ", instance_id))
+  
+  # Check status
+  describe_result <- ec2$describe_instances(
+    InstanceIds = list(instance_id)
+  )
+  
+  instance_state <- describe_result$Reservations[[1]]$Instances[[1]]$State$Name
+  
+  if (instance_state != "running") {
+    start_result <- ec2$start_instances(
+      InstanceIds = list(instance_id)
+    )
+    cli_alert_success("Instance start command issued")
+  } else {
+    cli_alert_success("Instance is already running")
+  }
+  
+  # Return info
+  return(list(
+    instance_id = instance_id,
+    region = region,
+    state = instance_state
+  ))
+}
+
+#' @title faasr_stop_vm
+#' @description 
+#' Manually stop the VM
+#' @param instance_id Optional instance ID override
+#' @param region Optional region override
+#' @return VM information
+#' @export
+faasr_stop_vm <- function(instance_id=NULL, region=NULL) {
+  # Get configuration
+  svc <- .faasr_get_svc()
+  faasr <- svc$json
+  cred <- faasr_collect_sys_env(faasr, svc$cred)
+  faasr <- faasr_replace_values(faasr, cred)
+  
+  # Find the VM server
+  vm_server_name <- NULL
+  for (server_name in names(faasr$ComputeServers)) {
+    if (faasr$ComputeServers[[server_name]]$FaaSType == "VM") {
+      vm_server_name <- server_name
+      break
+    }
+  }
+  
+  if (is.null(vm_server_name)) {
+    cli_alert_danger("No VM server defined in configuration")
+    return(NULL)
+  }
+  
+  # Get VM configuration
+  vm_config <- faasr$ComputeServers[[vm_server_name]]
+  
+  # Get instance details
+  if (is.null(instance_id)) {
+    instance_id <- vm_config$InstanceId
+  }
+  
+  if (is.null(region)) {
+    region <- vm_config$Region
+  }
+  
+  # Create EC2 client
+  ec2 <- paws.compute::ec2(
+    config = list(
+      credentials = list(
+        creds = list(
+          access_key_id = vm_config$AccessKey,
+          secret_key = vm_config$SecretKey
+        )
+      ),
+      region = region
+    )
+  )
+  
+  # Stop instance
+  cli_alert_info(paste0("Stopping EC2 instance: ", instance_id))
+  
+  # Check status
+  describe_result <- ec2$describe_instances(
+    InstanceIds = list(instance_id)
+  )
+  
+  instance_state <- describe_result$Reservations[[1]]$Instances[[1]]$State$Name
+  
+  if (instance_state == "running") {
+    stop_result <- ec2$stop_instances(
+      InstanceIds = list(instance_id)
+    )
+    cli_alert_success("Instance stop command issued")
+  } else {
+    cli_alert_success(paste0("Instance is already ", instance_state))
+  }
+  
+  # Return info
+  return(list(
+    instance_id = instance_id,
+    region = region,
+    state = instance_state
+  ))
+}
+
+# Add to operations
+.faasr_user$operations$preview_vm_strategy <- faasr_preview_vm_strategy
+.faasr_user$operations$start_vm <- faasr_start_vm
+.faasr_user$operations$stop_vm <- faasr_stop_vm

@@ -42,7 +42,8 @@
             "FunctionName":{"type":"string","minLength": 1},
             "Arguments":{"type":"object"},
             "InvokeNext":{"type":["string", "array"]},
-            "Rank":{"type":"string"}
+            "Rank":{"type":"string"},
+            "ResourceIntensive": {"type":["boolean", "object"]}
           },
           "required":["FaaSServer", "FunctionName"],
           "additionalProperties": false
@@ -58,7 +59,7 @@
         "":{
           "type":"object",
           "properties":{
-            "FaaSType":{"enum":["OpenWhisk", "GitHubActions", "Lambda"]},
+            "FaaSType":{"enum":["OpenWhisk", "GitHubActions", "Lambda","VM"]},
             "Region":{"type":"string","minLength": 1},
             "Endpoint":{"type":"string","minLength": 1},
             "Namespace":{"type":"string","minLength": 1},
@@ -69,7 +70,8 @@
             "ActionRepoName":{"type":"string","minLenght": 1},            
             "Token":{"type":"string","minLength": 1},
             "Branch":{"type":"string"},
-            "SSL":{"type":"string","minLength": 1}
+            "SSL":{"type":"string","minLength": 1},
+            "InstanceId": {"type":"string","minLength": 1}
           },
           "additionalProperties":false,
           "allOf":[
@@ -99,7 +101,16 @@
               "then": {
                 "required":["UserName", "ActionRepoName", "Token"]
               }
-            }
+            },
+            {
+    "if": {
+      "properties": {"FaaSType": {"const": "VM"}},
+      "required": ["FaaSType"]
+    },
+    "then": {
+      "required": ["InstanceId", "Region", "AccessKey", "SecretKey"]
+    }
+  }
           ]
         }
       }
