@@ -64,7 +64,7 @@
         "":{
           "type":"object",
           "properties":{
-            "FaaSType":{"enum":["OpenWhisk", "GitHubActions", "Lambda"]},
+            "FaaSType":{"enum":["OpenWhisk", "GitHubActions", "Lambda", "SLURM"]},
             "Region":{"type":"string","minLength": 1},
             "Endpoint":{"type":"string","minLength": 1},
             "Namespace":{"type":"string","minLength": 1},
@@ -75,7 +75,15 @@
             "ActionRepoName":{"type":"string","minLenght": 1},            
             "Token":{"type":"string","minLength": 1},
             "Branch":{"type":"string"},
-            "SSL":{"type":"string","minLength": 1}
+            "SSL":{"type":"string","minLength": 1},
+            "APIVersion":{"type":"string"},
+            "Partition":{"type":"string"},
+            "Nodes":{"type":"integer", "minimum": 1},
+            "Tasks":{"type":"integer", "minimum": 1},
+            "CPUsPerTask":{"type":"integer", "minimum": 1},
+            "Memory":{"type":"integer", "minimum": 1},
+            "TimeLimit":{"type":"integer", "minimum": 1},
+            "WorkingDirectory":{"type":"string"}
           },
           "additionalProperties":false,
           "allOf":[
@@ -104,6 +112,15 @@
               },
               "then": {
                 "required":["UserName", "ActionRepoName", "Token"]
+              }
+            },
+            {
+              "if": {
+                "properties": {"FaaSType":{"const": "SLURM"}},
+                "required":["FaaSType"]
+              },
+              "then": {
+                "required":["Endpoint"]
               }
             }
           ]
