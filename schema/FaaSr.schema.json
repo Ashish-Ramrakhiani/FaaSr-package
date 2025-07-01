@@ -120,7 +120,7 @@
                 "required":["FaaSType"]
               },
               "then": {
-                "required":["Endpoint"]
+                "required":["Endpoint", "Token", "UserName", "APIVersion", "Partition"]
               }
             }
           ]
