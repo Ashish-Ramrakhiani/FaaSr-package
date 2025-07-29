@@ -4,7 +4,7 @@
 \alias{faasr_execute_regular_function}
 \title{Execute function without VM orchestration}
 \usage{
-faasr_execute_regular_function(faasr)
+faasr_execute_regular_function(.faasr)
 }
 \arguments{
 \item{faasr}{FaaSr configuration list}

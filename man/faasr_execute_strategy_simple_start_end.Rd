@@ -4,7 +4,7 @@
 \alias{faasr_execute_strategy_simple_start_end}
 \title{Execute Strategy 1: VM start at first function, stop at last function}
 \usage{
-faasr_execute_strategy_simple_start_end(faasr)
+faasr_execute_strategy_simple_start_end(.faasr)
 }
 \arguments{
 \item{faasr}{FaaSr configuration list}

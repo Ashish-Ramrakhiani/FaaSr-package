@@ -4,7 +4,7 @@
 \alias{faasr_vm_orchestrate}
 \title{Main VM orchestration entry point}
 \usage{
-faasr_vm_orchestrate(faasr)
+faasr_vm_orchestrate(.faasr)
 }
 \arguments{
 \item{faasr}{FaaSr configuration list}

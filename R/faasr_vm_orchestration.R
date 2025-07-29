@@ -31,8 +31,8 @@ faasr_vm_orchestrate <- function(.faasr) {
 #' @export
 faasr_workflow_needs_vm <- function(.faasr) {
   
-  for (func_name in names(faasr$FunctionList)) {
-    func_config <- faasr$FunctionList[[func_name]]
+  for (func_name in names(.faasr$FunctionList)) {
+    func_config <- .faasr$FunctionList[[func_name]]
     if (!is.null(func_config$RequiresVM) && func_config$RequiresVM == TRUE) {
       return(TRUE)
     }
@@ -49,11 +49,11 @@ faasr_get_vm_strategy <- function(.faasr) {
   # Default to simple start/end strategy
   default_strategy <- "simple_start_end"
   
-  if (is.null(faasr$VMConfig)) {
+  if (is.null(.faasr$VMConfig)) {
     return(default_strategy)
   }
   
-  strategy <- faasr$VMConfig$Strategy %||% default_strategy
+  strategy <- .faasr$VMConfig$Strategy %||% default_strategy
   return(strategy)
 }
 
@@ -63,7 +63,7 @@ faasr_get_vm_strategy <- function(.faasr) {
 #' @export
 faasr_execute_strategy_simple_start_end <- function(.faasr) {
   
-  current_function <- faasr$FunctionInvoke
+  current_function <- .faasr$FunctionInvoke
   
   # Determine function position in workflow
   function_position <- faasr_get_function_position_in_workflow(.faasr, current_function)
@@ -87,8 +87,8 @@ faasr_execute_strategy_simple_start_end <- function(.faasr) {
   }
   
   # STEP 2: Execute the function
-  if (!is.null(faasr$FunctionList[[current_function]]$RequiresVM) && 
-      faasr$FunctionList[[current_function]]$RequiresVM == TRUE) {
+  if (!is.null(.faasr$FunctionList[[current_function]]$RequiresVM) && 
+      .faasr$FunctionList[[current_function]]$RequiresVM == TRUE) {
     
     log_msg <- paste0("Function ", current_function, " will execute on self-hosted runner (VM)")
     faasr_log(log_msg)
@@ -121,8 +121,8 @@ faasr_execute_strategy_simple_start_end <- function(.faasr) {
 #' @export
 faasr_get_function_position_in_workflow <- function(.faasr, current_function) {
   
-  workflow <- faasr$FunctionList
-  entry_point <- faasr$FunctionInvoke
+  workflow <- .faasr$FunctionList
+  entry_point <- .faasr$FunctionInvoke
   
   # Check if this is the entry point (first function)
   is_first <- (current_function == entry_point)
@@ -157,7 +157,7 @@ faasr_get_function_position_in_workflow <- function(.faasr, current_function) {
 #' @export
 faasr_execute_regular_function <- function(.faasr) {
   
-  log_msg <- paste0("Executing regular function: ", faasr$FunctionInvoke)
+  log_msg <- paste0("Executing regular function: ", .faasr$FunctionInvoke)
   faasr_log(log_msg)
   cat(log_msg, "\n")
   
@@ -181,11 +181,11 @@ faasr_execute_strategy_optimized <- function(.faasr) {
 #' @export
 faasr_vm_start <- function(.faasr) {
   
-  if (is.null(faasr$VMConfig)) {
+  if (is.null(.faasr$VMConfig)) {
     stop("VMConfig not found in workflow configuration")
   }
   
-  vm_config <- faasr$VMConfig
+  vm_config <- .faasr$VMConfig
   faasr_validate_vm_config(vm_config)
   
   log_msg <- paste0("Starting VM: ", vm_config$Provider, " ", vm_config$InstanceType)
@@ -317,7 +317,7 @@ faasr_vm_put_state <- function(.faasr, vm_details) {
 #' @export
 faasr_vm_get_state <- function(.faasr) {
   
-  state_file <- paste0(faasr$InvocationID, "_vm_state.json")
+  state_file <- paste0(.faasr$InvocationID, "_vm_state.json")
   temp_file <- tempfile(fileext = ".json")
   
   tryCatch({
@@ -345,7 +345,7 @@ faasr_vm_get_state <- function(.faasr) {
 #' @param faasr FaaSr configuration list
 #' @export
 faasr_vm_delete_state <- function(.faasr) {
-  state_file <- paste0(faasr$InvocationID, "_vm_state.json")
+  state_file <- paste0(.faasr$InvocationID, "_vm_state.json")
   faasr_delete_file(remote_folder = "FaaSrVM", remote_file = state_file)
 }
 
@@ -354,7 +354,7 @@ faasr_vm_delete_state <- function(.faasr) {
 #' @param vm_config VM configuration
 #' @importFrom paws.compute ec2
 #' @export
-faasr_aws_start_vm <- function(vm_config, faasr = NULL) {
+faasr_aws_start_vm <- function(vm_config, faasr=NULL) {
   
   # CORRECTED: Follow DataStore credential pattern - get from environment
   aws_access_key <- Sys.getenv(vm_config$AccessKey)
@@ -380,7 +380,7 @@ faasr_aws_start_vm <- function(vm_config, faasr = NULL) {
   )
   
   # Get workflow ID for tagging
-  workflow_id <- if (!is.null(faasr)) faasr$InvocationID else "unknown"
+  workflow_id <- if (!is.null(.faasr)) .faasr$InvocationID else "unknown"
   
   # Start instance
   result <- ec2$run_instances(list(

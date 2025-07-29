@@ -4,7 +4,7 @@
 \alias{faasr_vm_delete_state}
 \title{Delete VM state from S3}
 \usage{
-faasr_vm_delete_state(faasr)
+faasr_vm_delete_state(.faasr)
 }
 \arguments{
 \item{faasr}{FaaSr configuration list}

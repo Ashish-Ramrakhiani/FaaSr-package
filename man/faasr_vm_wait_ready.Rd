@@ -4,12 +4,12 @@
 \alias{faasr_vm_wait_ready}
 \title{Wait for VM to be ready}
 \usage{
-faasr_vm_wait_ready(faasr, vm_details)
+faasr_vm_wait_ready(.faasr, vm_details)
 }
 \arguments{
-\item{faasr}{FaaSr configuration list}
-
 \item{vm_details}{VM details from start operation}
+
+\item{faasr}{FaaSr configuration list}
 }
 \description{
 Wait for VM to be ready

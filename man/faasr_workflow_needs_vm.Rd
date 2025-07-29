@@ -4,7 +4,7 @@
 \alias{faasr_workflow_needs_vm}
 \title{Check if any function in workflow requires VM}
 \usage{
-faasr_workflow_needs_vm(faasr)
+faasr_workflow_needs_vm(.faasr)
 }
 \arguments{
 \item{faasr}{FaaSr configuration list}

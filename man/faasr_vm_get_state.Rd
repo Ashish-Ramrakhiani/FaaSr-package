@@ -4,7 +4,7 @@
 \alias{faasr_vm_get_state}
 \title{Retrieve VM state from S3}
 \usage{
-faasr_vm_get_state(faasr)
+faasr_vm_get_state(.faasr)
 }
 \arguments{
 \item{faasr}{FaaSr configuration list}

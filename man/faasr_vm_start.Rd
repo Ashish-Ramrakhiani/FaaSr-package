@@ -4,7 +4,7 @@
 \alias{faasr_vm_start}
 \title{Start VM instance}
 \usage{
-faasr_vm_start(faasr)
+faasr_vm_start(.faasr)
 }
 \arguments{
 \item{faasr}{FaaSr configuration list}

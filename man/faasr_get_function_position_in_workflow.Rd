@@ -4,12 +4,12 @@
 \alias{faasr_get_function_position_in_workflow}
 \title{Determine if function is first, last, or middle in workflow}
 \usage{
-faasr_get_function_position_in_workflow(faasr, current_function)
+faasr_get_function_position_in_workflow(.faasr, current_function)
 }
 \arguments{
-\item{faasr}{FaaSr configuration list}
-
 \item{current_function}{Name of current function}
+
+\item{faasr}{FaaSr configuration list}
 }
 \description{
 Determine if function is first, last, or middle in workflow

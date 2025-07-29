@@ -4,12 +4,12 @@
 \alias{faasr_vm_put_state}
 \title{Store VM state in S3}
 \usage{
-faasr_vm_put_state(faasr, vm_details)
+faasr_vm_put_state(.faasr, vm_details)
 }
 \arguments{
-\item{faasr}{FaaSr configuration list}
-
 \item{vm_details}{VM details to store}
+
+\item{faasr}{FaaSr configuration list}
 }
 \description{
 Store VM state in S3

@@ -4,7 +4,7 @@
 \alias{faasr_vm_terminate}
 \title{Terminate VM instance}
 \usage{
-faasr_vm_terminate(faasr)
+faasr_vm_terminate(.faasr)
 }
 \arguments{
 \item{faasr}{FaaSr configuration list}
