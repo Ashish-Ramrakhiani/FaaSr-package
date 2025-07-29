@@ -75,33 +75,36 @@ faasr_execute_strategy_simple_start_end <- function(faasr) {
   
   # STEP 1: Handle VM start (only for first function)
   if (function_position$is_first) {
-    log_msg <- "Strategy 1: Starting VM at beginning of workflow"
+    log_msg <- "Strategy 1: Starting VM (runner service will auto-start)"
     faasr_log(log_msg)
     cat(log_msg, "\n")
     
     vm_details <- faasr_vm_start(faasr)
     faasr_vm_wait_ready(faasr, vm_details)
+    
+    log_msg <- "VM started - GitHub Actions runner service is now available"
+    faasr_log(log_msg)
   }
   
   # STEP 2: Execute the function
   if (!is.null(faasr$FunctionList[[current_function]]$RequiresVM) && 
       faasr$FunctionList[[current_function]]$RequiresVM == TRUE) {
     
-    log_msg <- paste0("Executing VM-intensive function: ", current_function)
+    log_msg <- paste0("Function ", current_function, " will execute on self-hosted runner (VM)")
     faasr_log(log_msg)
     cat(log_msg, "\n")
   } else {
-    log_msg <- paste0("Executing regular function: ", current_function)
+    log_msg <- paste0("Function ", current_function, " will execute on GitHub-hosted runner")
     faasr_log(log_msg)
     cat(log_msg, "\n")
   }
   
-  # Execute user function (same regardless of VM requirement)
+  # Execute user function (GitHub Actions handles runner routing automatically)
   .faasr <- faasr_run_user_function(faasr)
   
   # STEP 3: Handle VM stop (only for last function)
   if (function_position$is_last) {
-    log_msg <- "Strategy 1: Stopping VM at end of workflow"
+    log_msg <- "Strategy 1: Terminating VM (runner service will auto-stop)"
     faasr_log(log_msg)
     cat(log_msg, "\n")
     
@@ -188,9 +191,9 @@ faasr_vm_start <- function(faasr) {
   log_msg <- paste0("Starting VM: ", vm_config$Provider, " ", vm_config$InstanceType)
   faasr_log(log_msg)
   
-  # Dispatch to cloud provider
+  # Dispatch to cloud provider - FIXED: Pass both vm_config AND faasr
   vm_details <- switch(vm_config$Provider,
-                       "AWS" = faasr_aws_start_vm(vm_config),
+                       "AWS" = faasr_aws_start_vm(vm_config, faasr),
                        stop(paste("Unsupported VM provider:", vm_config$Provider))
   )
   
@@ -351,8 +354,9 @@ faasr_vm_delete_state <- function(faasr) {
 #' @param vm_config VM configuration
 #' @importFrom paws.compute ec2
 #' @export
-faasr_aws_start_vm <- function(vm_config) {
+faasr_aws_start_vm <- function(vm_config, faasr = NULL) {
   
+  # CORRECTED: Follow DataStore credential pattern - get from environment
   aws_access_key <- Sys.getenv(vm_config$AccessKey)
   aws_secret_key <- Sys.getenv(vm_config$SecretKey)
   
@@ -361,7 +365,7 @@ faasr_aws_start_vm <- function(vm_config) {
                vm_config$AccessKey, "or", vm_config$SecretKey))
   }
   
-  log_msg <- paste0("Using AWS credentials: ", vm_config$AccessKey, " (access key)")
+  log_msg <- paste0("Using AWS credentials from environment variable: ", vm_config$AccessKey)
   faasr_log(log_msg)
   
   # Create EC2 client
@@ -374,6 +378,9 @@ faasr_aws_start_vm <- function(vm_config) {
       region = vm_config$Region
     )
   )
+  
+  # Get workflow ID for tagging
+  workflow_id <- if (!is.null(faasr)) faasr$InvocationID else "unknown"
   
   # Start instance
   result <- ec2$run_instances(list(
@@ -388,10 +395,10 @@ faasr_aws_start_vm <- function(vm_config) {
       list(
         ResourceType = "instance",
         Tags = list(
-          list(Key = "Name", Value = "FaaSr-Strategy1-VM"),
-          list(Key = "Purpose", Value = "FaaSr-Strategy1"),
+          list(Key = "Name", Value = "FaaSr-VM-AutoRunner"),
+          list(Key = "Purpose", Value = "FaaSr-GitHub-Runner"),
           list(Key = "CreatedBy", Value = "FaaSr"),
-          list(Key = "WorkflowID", Value = faasr$InvocationID %||% "unknown")
+          list(Key = "WorkflowID", Value = workflow_id)
         )
       )
     )

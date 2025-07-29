@@ -244,6 +244,45 @@ faasr_collect_sys_env <- function(faasr, cred){
       }
     }
   }
+  
+  
+  if (!is.null(faasr$VMConfig)) {
+    # Use key types for "AccessKey" and "SecretKey"
+    cred_name_ac <- faasr$VMConfig$AccessKey
+    if (is.null(cred_name_ac)) {
+      cred_name_ac <- "VMCONFIG_ACCESS_KEY"
+    }
+    cred_name_sc <- faasr$VMConfig$SecretKey
+    if (is.null(cred_name_sc)) {
+      cred_name_sc <- "VMCONFIG_SECRET_KEY"
+    }
+    
+    if (is.null(cred[[cred_name_ac]])) {
+      real_cred <- Sys.getenv(cred_name_ac)
+      if (real_cred == "") {
+        ask_cred <- askpass::askpass(paste0("Enter keys for ", cred_name_ac))
+        ask_cred_list <- list(ask_cred)
+        names(ask_cred_list) <- cred_name_ac
+        do.call(Sys.setenv, ask_cred_list)
+        cred[[cred_name_ac]] <- ask_cred
+      } else {
+        cred[[cred_name_ac]] <- real_cred
+      }
+    }
+    
+    if (is.null(cred[[cred_name_sc]])) {
+      real_cred <- Sys.getenv(cred_name_sc)
+      if (real_cred == "") {
+        ask_cred <- askpass::askpass(paste0("Enter keys for ", cred_name_sc))
+        ask_cred_list <- list(ask_cred)
+        names(ask_cred_list) <- cred_name_sc
+        do.call(Sys.setenv, ask_cred_list)
+        cred[[cred_name_sc]] <- ask_cred
+      } else {
+        cred[[cred_name_sc]] <- real_cred
+      }
+    }
+  }
   return(cred)
 }
 
@@ -464,6 +503,22 @@ faasr <- function(json_path=NULL, env_path=NULL){
       }
     }
     svc$json$DataStores[[data_js]]$SecretKey <- paste0(data_js,"_SECRET_KEY")
+  }
+  
+  if (!is.null(svc$json$VMConfig)) {
+    if (!is.null(svc$json$VMConfig$AccessKey)) {
+      if (svc$json$VMConfig$AccessKey != "VMCONFIG_ACCESS_KEY") {
+        svc$cred[["VMCONFIG_ACCESS_KEY"]] <- svc$json$VMConfig$AccessKey
+      }
+    }
+    svc$json$VMConfig$AccessKey <- "VMCONFIG_ACCESS_KEY"
+    
+    if (!is.null(svc$json$VMConfig$SecretKey)) {
+      if (svc$json$VMConfig$SecretKey != "VMCONFIG_SECRET_KEY") {
+        svc$cred[["VMCONFIG_SECRET_KEY"]] <- svc$json$VMConfig$SecretKey
+      }
+    }
+    svc$json$VMConfig$SecretKey <- "VMCONFIG_SECRET_KEY"
   }
   
   # if env_path is given, it would read the envrionment values from the path 

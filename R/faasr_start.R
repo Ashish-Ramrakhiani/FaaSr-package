@@ -70,6 +70,8 @@ faasr_start <- function(faasr_payload) {
       return("abort-on-multiple-invocation")
     }
   }
+  
+  .faasr <- faasr_vm_orchestrate(.faasr)
 
   return(.faasr)
 }

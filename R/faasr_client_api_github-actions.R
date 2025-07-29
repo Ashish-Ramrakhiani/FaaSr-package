@@ -46,6 +46,54 @@ jobs:
         cd /action
         Rscript faasr_start_invoke_github-actions.R"
 
+workflow_runner_schema <- "name: Running Action- <<actionname>>
+on:
+  workflow_dispatch:
+    inputs:
+      PAYLOAD:
+        description: 'Payload'
+        required: false
+
+jobs:
+  run_docker_image:
+    runs-on: self-hosted
+    container: <<container_name>>
+    env:
+      SECRET_PAYLOAD: ${{ secrets.SECRET_PAYLOAD }}
+      GITHUB_PAT: ${{ secrets.GITHUB_TOKEN }}
+      PAYLOAD_REPO: ${{ vars.PAYLOAD_REPO }}
+      PAYLOAD: ${{ github.event.inputs.PAYLOAD }}
+    steps:
+    - name: run Rscript
+      run: |
+        cd /action
+        Rscript faasr_start_invoke_github-actions.R"
+
+workflow_runner_w_timer_schema <- "name: Running Action- <<actionname>>
+on:
+  schedule:
+    - cron: '<<cron>>'
+  workflow_dispatch:
+    inputs:
+      PAYLOAD:
+        description: 'Payload'
+        required: false
+
+jobs:
+  run_docker_image:
+    runs-on: self-hosted
+    container: <<container_name>>
+    env:
+      SECRET_PAYLOAD: ${{ secrets.SECRET_PAYLOAD }}
+      GITHUB_PAT: ${{ secrets.GITHUB_TOKEN }}
+      PAYLOAD_REPO: ${{ vars.PAYLOAD_REPO }}
+      PAYLOAD: ${{ github.event.inputs.PAYLOAD }}
+    steps:
+    - name: run Rscript
+      run: |
+        cd /action
+        Rscript faasr_start_invoke_github-actions.R"
+
 #TBD. workflow_runner_path <- ""
 #TBD. workflow_runner_w_timer_path <- ""
 
@@ -389,20 +437,29 @@ faasr_register_workflow_github_create_yml_file <- function(faasr, actionname, re
   } else {
     container_name <- faasr$ActionContainers[[actionname]]
   }
+  
+  function_config <- faasr$FunctionList[[actionname]]
+  requires_vm <- !is.null(function_config$RequiresVM) && function_config$RequiresVM == TRUE
+  
+  
   # check "runner" / "cron" and bring templates from github
-  if (runner){
+  if (requires_vm) {
+    # Use self-hosted runner templates for VM functions
     if (is.null(cron)){
-      #contents_git <- readLines(workflow_runner_path)
+      contents_git <- workflow_runner_schema
     } else {
-      #contents_git <- readLines(workflow_runner_w_timer_path)
+      contents_git <- workflow_runner_w_timer_schema
     }
   } else {
+    # Use GitHub-hosted runners for normal functions
     if (is.null(cron)){
       contents_git <- workflow_basic_schema
     } else {
       contents_git <- workflow_timer_schema
     }
   }
+  
+
   # create customized contents by using "glue"
   #contents_git <- paste(contents_git, collapse = "\n")
   contents <- glue::glue(contents_git, .open = "<<", .close = ">>")
