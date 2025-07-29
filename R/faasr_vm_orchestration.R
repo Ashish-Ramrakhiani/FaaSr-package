@@ -3,22 +3,22 @@
 #' @description Handles VM lifecycle transparently based on strategy
 #' @param faasr FaaSr configuration list
 #' @export
-faasr_vm_orchestrate <- function(faasr) {
+faasr_vm_orchestrate <- function(.faasr) {
   
   # Check if workflow has any VM requirements
-  if (!faasr_workflow_needs_vm(faasr)) {
+  if (!faasr_workflow_needs_vm(.faasr)) {
     # No VM needed - execute normally
-    return(faasr_execute_regular_function(faasr))
+    return(faasr_execute_regular_function(.faasr))
   }
   
   # Get VM strategy from configuration
-  vm_strategy <- faasr_get_vm_strategy(faasr)
+  vm_strategy <- faasr_get_vm_strategy(.faasr)
   
   # Dispatch to strategy-specific handler
   result <- switch(vm_strategy,
-                   "simple_start_end" = faasr_execute_strategy_simple_start_end(faasr),
-                   "per_function" = faasr_execute_strategy_per_function(faasr),      # Future: Strategy 2
-                   "optimized" = faasr_execute_strategy_optimized(faasr),           # Future: Strategy 3
+                   "simple_start_end" = faasr_execute_strategy_simple_start_end(.faasr),
+                   "per_function" = faasr_execute_strategy_per_function(.faasr),      # Future: Strategy 2
+                   "optimized" = faasr_execute_strategy_optimized(.faasr),           # Future: Strategy 3
                    stop(paste("Unknown VM strategy:", vm_strategy))
   )
   
@@ -29,7 +29,7 @@ faasr_vm_orchestrate <- function(faasr) {
 #' @title Check if any function in workflow requires VM
 #' @param faasr FaaSr configuration list
 #' @export
-faasr_workflow_needs_vm <- function(faasr) {
+faasr_workflow_needs_vm <- function(.faasr) {
   
   for (func_name in names(faasr$FunctionList)) {
     func_config <- faasr$FunctionList[[func_name]]
@@ -44,7 +44,7 @@ faasr_workflow_needs_vm <- function(faasr) {
 #' @title Get VM orchestration strategy from configuration
 #' @param faasr FaaSr configuration list
 #' @export
-faasr_get_vm_strategy <- function(faasr) {
+faasr_get_vm_strategy <- function(.faasr) {
   
   # Default to simple start/end strategy
   default_strategy <- "simple_start_end"
@@ -61,12 +61,12 @@ faasr_get_vm_strategy <- function(faasr) {
 #' @title Execute Strategy 1: VM start at first function, stop at last function
 #' @param faasr FaaSr configuration list
 #' @export
-faasr_execute_strategy_simple_start_end <- function(faasr) {
+faasr_execute_strategy_simple_start_end <- function(.faasr) {
   
   current_function <- faasr$FunctionInvoke
   
   # Determine function position in workflow
-  function_position <- faasr_get_function_position_in_workflow(faasr, current_function)
+  function_position <- faasr_get_function_position_in_workflow(.faasr, current_function)
   
   log_msg <- paste0("Strategy 1 - Function: ", current_function, 
                     ", Position: ", function_position$type)
@@ -79,8 +79,8 @@ faasr_execute_strategy_simple_start_end <- function(faasr) {
     faasr_log(log_msg)
     cat(log_msg, "\n")
     
-    vm_details <- faasr_vm_start(faasr)
-    faasr_vm_wait_ready(faasr, vm_details)
+    vm_details <- faasr_vm_start(.faasr)
+    faasr_vm_wait_ready(.faasr, vm_details)
     
     log_msg <- "VM started - GitHub Actions runner service is now available"
     faasr_log(log_msg)
@@ -100,7 +100,7 @@ faasr_execute_strategy_simple_start_end <- function(faasr) {
   }
   
   # Execute user function (GitHub Actions handles runner routing automatically)
-  .faasr <- faasr_run_user_function(faasr)
+  .faasr <- faasr_run_user_function(.faasr)
   
   # STEP 3: Handle VM stop (only for last function)
   if (function_position$is_last) {
@@ -119,7 +119,7 @@ faasr_execute_strategy_simple_start_end <- function(faasr) {
 #' @param faasr FaaSr configuration list
 #' @param current_function Name of current function
 #' @export
-faasr_get_function_position_in_workflow <- function(faasr, current_function) {
+faasr_get_function_position_in_workflow <- function(.faasr, current_function) {
   
   workflow <- faasr$FunctionList
   entry_point <- faasr$FunctionInvoke
@@ -155,23 +155,23 @@ faasr_get_function_position_in_workflow <- function(faasr, current_function) {
 #' @title Execute function without VM orchestration
 #' @param faasr FaaSr configuration list
 #' @export
-faasr_execute_regular_function <- function(faasr) {
+faasr_execute_regular_function <- function(.faasr) {
   
   log_msg <- paste0("Executing regular function: ", faasr$FunctionInvoke)
   faasr_log(log_msg)
   cat(log_msg, "\n")
   
   # Standard FaaSr execution
-  .faasr <- faasr_run_user_function(faasr)
+  .faasr <- faasr_run_user_function(.faasr)
   return(.faasr)
 }
 
 # PLACEHOLDER IMPLEMENTATIONS FOR FUTURE STRATEGIES
-faasr_execute_strategy_per_function <- function(faasr) {
+faasr_execute_strategy_per_function <- function(.faasr) {
   stop("Strategy 2 (per_function) not yet implemented")
 }
 
-faasr_execute_strategy_optimized <- function(faasr) {
+faasr_execute_strategy_optimized <- function(.faasr) {
   stop("Strategy 3 (optimized) not yet implemented")
 }
 
@@ -179,7 +179,7 @@ faasr_execute_strategy_optimized <- function(faasr) {
 #' @title Start VM instance
 #' @param faasr FaaSr configuration list
 #' @export
-faasr_vm_start <- function(faasr) {
+faasr_vm_start <- function(.faasr) {
   
   if (is.null(faasr$VMConfig)) {
     stop("VMConfig not found in workflow configuration")
@@ -193,12 +193,12 @@ faasr_vm_start <- function(faasr) {
   
   # Dispatch to cloud provider - FIXED: Pass both vm_config AND faasr
   vm_details <- switch(vm_config$Provider,
-                       "AWS" = faasr_aws_start_vm(vm_config, faasr),
+                       "AWS" = faasr_aws_start_vm(vm_config, .faasr),
                        stop(paste("Unsupported VM provider:", vm_config$Provider))
   )
   
   # Store VM state for later cleanup
-  faasr_vm_put_state(faasr, vm_details)
+  faasr_vm_put_state(.faasr, vm_details)
   
   log_msg <- paste0("VM started: ", vm_details$InstanceId)
   faasr_log(log_msg)
@@ -210,10 +210,10 @@ faasr_vm_start <- function(faasr) {
 #' @title Terminate VM instance
 #' @param faasr FaaSr configuration list
 #' @export
-faasr_vm_terminate <- function(faasr) {
+faasr_vm_terminate <- function(.faasr) {
   
   # Get VM state
-  vm_details <- faasr_vm_get_state(faasr)
+  vm_details <- faasr_vm_get_state(.faasr)
   
   if (is.null(vm_details)) {
     log_msg <- "No VM state found - VM may already be terminated"
@@ -227,12 +227,12 @@ faasr_vm_terminate <- function(faasr) {
   
   # Dispatch to cloud provider
   success <- switch(vm_details$Provider,
-                    "AWS" = faasr_aws_terminate_vm(vm_details, faasr$VMConfig),
+                    "AWS" = faasr_aws_terminate_vm(vm_details, .faasr$VMConfig),
                     stop(paste("Unsupported VM provider:", vm_details$Provider))
   )
   
   if (success) {
-    faasr_vm_delete_state(faasr)
+    faasr_vm_delete_state(.faasr)
     log_msg <- paste0("VM terminated successfully: ", vm_details$InstanceId)
     faasr_log(log_msg)
   }
@@ -245,7 +245,7 @@ faasr_vm_terminate <- function(faasr) {
 #' @param faasr FaaSr configuration list
 #' @param vm_details VM details from start operation
 #' @export
-faasr_vm_wait_ready <- function(faasr, vm_details) {
+faasr_vm_wait_ready <- function(.faasr, vm_details) {
   
   max_wait_time <- 300  # 5 minutes
   check_interval <- 30  # 30 seconds
@@ -284,18 +284,18 @@ faasr_vm_wait_ready <- function(faasr, vm_details) {
 #' @param faasr FaaSr configuration list
 #' @param vm_details VM details to store
 #' @export
-faasr_vm_put_state <- function(faasr, vm_details) {
+faasr_vm_put_state <- function(.faasr, vm_details) {
   
   # Add metadata
   vm_state <- list(
     vm_details = vm_details,
-    workflow_id = faasr$InvocationID,
-    strategy = faasr_get_vm_strategy(faasr),
+    workflow_id = .faasr$InvocationID,
+    strategy = faasr_get_vm_strategy(.faasr),
     created_at = Sys.time(),
-    Provider = faasr$VMConfig$Provider
+    Provider = .faasr$VMConfig$Provider
   )
   
-  state_file <- paste0(faasr$InvocationID, "_vm_state.json")
+  state_file <- paste0(.faasr$InvocationID, "_vm_state.json")
   vm_json <- jsonlite::toJSON(vm_state, auto_unbox = TRUE, pretty = TRUE)
   
   temp_file <- tempfile(fileext = ".json")
@@ -315,7 +315,7 @@ faasr_vm_put_state <- function(faasr, vm_details) {
 #' @title Retrieve VM state from S3
 #' @param faasr FaaSr configuration list
 #' @export
-faasr_vm_get_state <- function(faasr) {
+faasr_vm_get_state <- function(.faasr) {
   
   state_file <- paste0(faasr$InvocationID, "_vm_state.json")
   temp_file <- tempfile(fileext = ".json")
@@ -344,7 +344,7 @@ faasr_vm_get_state <- function(faasr) {
 #' @title Delete VM state from S3
 #' @param faasr FaaSr configuration list
 #' @export
-faasr_vm_delete_state <- function(faasr) {
+faasr_vm_delete_state <- function(.faasr) {
   state_file <- paste0(faasr$InvocationID, "_vm_state.json")
   faasr_delete_file(remote_folder = "FaaSrVM", remote_file = state_file)
 }
