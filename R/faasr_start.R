@@ -71,7 +71,7 @@ faasr_start <- function(faasr_payload) {
     }
   }
   
-  .faasr <- faasr_vm_orchestrate(.faasr)
+  # .faasr <- faasr_vm_orchestrate(.faasr)
 
   return(.faasr)
 }
