@@ -291,9 +291,8 @@ faasr_aws_start_existing_vm <- function(vm_config, .faasr = NULL) {
     stop("InstanceId is required in VMConfig for existing instance strategy")
   }
   
-  # Get AWS credentials from environment (following DataStore pattern)
-  aws_access_key <- Sys.getenv(vm_config$AccessKey)
-  aws_secret_key <- Sys.getenv(vm_config$SecretKey)
+  aws_access_key <- vm_config$AccessKey
+  aws_secret_key <- vm_config$SecretKey
   
   if (aws_access_key == "" || aws_secret_key == "") {
     stop(paste("AWS credentials not found in environment variables:", 
@@ -349,8 +348,8 @@ faasr_aws_start_existing_vm <- function(vm_config, .faasr = NULL) {
 #' @export
 faasr_aws_stop_existing_vm <- function(vm_config) {
   
-  aws_access_key <- Sys.getenv(vm_config$AccessKey)
-  aws_secret_key <- Sys.getenv(vm_config$SecretKey)
+  aws_access_key <- vm_config$AccessKey
+  aws_secret_key <- vm_config$SecretKey
   
   if (aws_access_key == "" || aws_secret_key == "") {
     stop(paste("AWS credentials not found in environment variables:", 
