@@ -274,40 +274,38 @@ faasr_vm_wait_ready_simplified <- function(.faasr, vm_details) {
   }
 }
 
-# ------------------------------------------------------------------------------
-# AWS-SPECIFIC VM FUNCTIONS - UPDATED FOR EXISTING INSTANCES
-# ------------------------------------------------------------------------------
-
 #' @name faasr_aws_start_existing_vm
-#' @title Start existing AWS EC2 instance (replaces faasr_aws_start_vm)
+#' @title Start existing AWS EC2 instance following FaaSr credential pattern
 #' @param vm_config VM configuration including InstanceId
-#' @param .faasr FaaSr configuration list
+#' @param faasr FaaSr configuration list
 #' @importFrom paws.compute ec2
 #' @export
-faasr_aws_start_existing_vm <- function(vm_config, .faasr = NULL) {
+faasr_aws_start_existing_vm <- function(vm_config, faasr = NULL) {
   
   # Validate required fields for existing instance
   if (is.null(vm_config$InstanceId) || vm_config$InstanceId == "") {
     stop("InstanceId is required in VMConfig for existing instance strategy")
   }
   
+  # FaaSr credential pattern: credentials are already replaced by faasr_replace_values()
   aws_access_key <- vm_config$AccessKey
   aws_secret_key <- vm_config$SecretKey
   
-  if (aws_access_key == "" || aws_secret_key == "") {
-    stop(paste("AWS credentials not found in environment variables:", 
-               vm_config$AccessKey, "or", vm_config$SecretKey))
+  if (is.null(aws_access_key) || is.null(aws_secret_key) || 
+      aws_access_key == "" || aws_secret_key == "" ||
+      aws_access_key == "VMCONFIG_ACCESS_KEY" || aws_secret_key == "VMCONFIG_SECRET_KEY") {
+    stop("AWS credentials not properly replaced - check SECRET_PAYLOAD and VMConfig setup")
   }
   
-  log_msg <- paste0("Using AWS credentials from environment variable: ", vm_config$AccessKey)
+  log_msg <- "Using AWS credentials from FaaSr credential replacement"
   faasr_log(log_msg)
   
-  # Create EC2 client
+  # Create EC2 client with correct parameter names
   ec2 <- paws.compute::ec2(
     config = list(
       credentials = list(
-        accessKeyId = aws_access_key,
-        secretAccessKey = aws_secret_key
+        access_key_id = aws_access_key,      # FIXED: correct parameter name
+        secret_access_key = aws_secret_key   # FIXED: correct parameter name
       ),
       region = vm_config$Region
     )
@@ -319,7 +317,7 @@ faasr_aws_start_existing_vm <- function(vm_config, .faasr = NULL) {
   
   # Start the existing instance
   tryCatch({
-    result <- ec2$start_instances(list(InstanceIds = list(vm_config$InstanceId)))
+    result <- ec2$start_instances(InstanceIds = list(vm_config$InstanceId))  # FIXED: simplified parameter
     
     if (length(result$StartingInstances) > 0) {
       instance_info <- result$StartingInstances[[1]]
@@ -343,25 +341,27 @@ faasr_aws_start_existing_vm <- function(vm_config, .faasr = NULL) {
 }
 
 #' @name faasr_aws_stop_existing_vm
-#' @title Stop existing AWS EC2 instance (replaces faasr_aws_terminate_vm)
+#' @title Stop existing AWS EC2 instance following FaaSr credential pattern
 #' @param vm_config VM configuration including InstanceId
 #' @export
 faasr_aws_stop_existing_vm <- function(vm_config) {
   
+  # FaaSr credential pattern: credentials are already replaced by faasr_replace_values()
   aws_access_key <- vm_config$AccessKey
   aws_secret_key <- vm_config$SecretKey
   
-  if (aws_access_key == "" || aws_secret_key == "") {
-    stop(paste("AWS credentials not found in environment variables:", 
-               vm_config$AccessKey, "or", vm_config$SecretKey))
+  if (is.null(aws_access_key) || is.null(aws_secret_key) || 
+      aws_access_key == "" || aws_secret_key == "" ||
+      aws_access_key == "VMCONFIG_ACCESS_KEY" || aws_secret_key == "VMCONFIG_SECRET_KEY") {
+    stop("AWS credentials not properly replaced - check SECRET_PAYLOAD and VMConfig setup")
   }
   
-  # Create EC2 client
+  # Create EC2 client with correct parameter names
   ec2 <- paws.compute::ec2(
     config = list(
       credentials = list(
-        accessKeyId = aws_access_key,
-        secretAccessKey = aws_secret_key
+        access_key_id = aws_access_key,      # FIXED: correct parameter name
+        secret_access_key = aws_secret_key   # FIXED: correct parameter name
       ),
       region = vm_config$Region
     )
@@ -373,7 +373,7 @@ faasr_aws_stop_existing_vm <- function(vm_config) {
   
   # Stop the instance (not terminate)
   tryCatch({
-    result <- ec2$stop_instances(list(InstanceIds = list(vm_config$InstanceId)))
+    result <- ec2$stop_instances(InstanceIds = list(vm_config$InstanceId))  # FIXED: simplified parameter
     
     if (length(result$StoppingInstances) > 0) {
       log_msg <- paste0("Instance ", vm_config$InstanceId, " is stopping")

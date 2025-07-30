@@ -2,7 +2,7 @@
 % Please edit documentation in R/faasr_vm_orchestration.R
 \name{faasr_aws_stop_existing_vm}
 \alias{faasr_aws_stop_existing_vm}
-\title{Stop existing AWS EC2 instance (replaces faasr_aws_terminate_vm)}
+\title{Stop existing AWS EC2 instance following FaaSr credential pattern}
 \usage{
 faasr_aws_stop_existing_vm(vm_config)
 }
@@ -10,5 +10,5 @@ faasr_aws_stop_existing_vm(vm_config)
 \item{vm_config}{VM configuration including InstanceId}
 }
 \description{
-Stop existing AWS EC2 instance (replaces faasr_aws_terminate_vm)
+Stop existing AWS EC2 instance following FaaSr credential pattern
 }

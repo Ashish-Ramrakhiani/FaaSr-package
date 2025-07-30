@@ -2,15 +2,15 @@
 % Please edit documentation in R/faasr_vm_orchestration.R
 \name{faasr_aws_start_existing_vm}
 \alias{faasr_aws_start_existing_vm}
-\title{Start existing AWS EC2 instance (replaces faasr_aws_start_vm)}
+\title{Start existing AWS EC2 instance following FaaSr credential pattern}
 \usage{
-faasr_aws_start_existing_vm(vm_config, .faasr = NULL)
+faasr_aws_start_existing_vm(vm_config, faasr = NULL)
 }
 \arguments{
 \item{vm_config}{VM configuration including InstanceId}
 
-\item{.faasr}{FaaSr configuration list}
+\item{faasr}{FaaSr configuration list}
 }
 \description{
-Start existing AWS EC2 instance (replaces faasr_aws_start_vm)
+Start existing AWS EC2 instance following FaaSr credential pattern
 }
