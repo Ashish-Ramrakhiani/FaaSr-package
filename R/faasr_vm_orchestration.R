@@ -16,7 +16,7 @@ faasr_vm_orchestrate <- function(.faasr) {
   
   # Dispatch to strategy-specific handler
   result <- switch(vm_strategy,
-                   "simple_start_end" = faasr_execute_strategy_simple_start_end(.faasr),
+                   "simple_start_end" = faasr_execute_strategy_simple_start_end_fixed(.faasr),  # CHANGED: Use fixed version
                    "per_function" = faasr_execute_strategy_per_function(.faasr),      # Future: Strategy 2
                    "optimized" = faasr_execute_strategy_optimized(.faasr),           # Future: Strategy 3
                    stop(paste("Unknown VM strategy:", vm_strategy))
@@ -57,32 +57,32 @@ faasr_get_vm_strategy <- function(.faasr) {
   return(strategy)
 }
 
-#' @name faasr_execute_strategy_simple_start_end
-#' @title Execute Strategy 1: VM start at first function, stop at last function
+#' @name faasr_execute_strategy_simple_start_end_fixed
+#' @title Execute Strategy 1: Fixed version using existing instance
 #' @param faasr FaaSr configuration list
 #' @export
-faasr_execute_strategy_simple_start_end <- function(.faasr) {
+faasr_execute_strategy_simple_start_end_fixed <- function(.faasr) {
   
   current_function <- .faasr$FunctionInvoke
   
   # Determine function position in workflow
   function_position <- faasr_get_function_position_in_workflow(.faasr, current_function)
   
-  log_msg <- paste0("Strategy 1 - Function: ", current_function, 
+  log_msg <- paste0("Strategy 1 (Fixed) - Function: ", current_function, 
                     ", Position: ", function_position$type)
   faasr_log(log_msg)
   cat(log_msg, "\n")
   
   # STEP 1: Handle VM start (only for first function)
   if (function_position$is_first) {
-    log_msg <- "Strategy 1: Starting VM (runner service will auto-start)"
+    log_msg <- "Strategy 1: Starting existing VM instance (runner will auto-start)"
     faasr_log(log_msg)
     cat(log_msg, "\n")
     
-    vm_details <- faasr_vm_start(.faasr)
-    faasr_vm_wait_ready(.faasr, vm_details)
+    vm_details <- faasr_vm_start_simplified(.faasr)
+    faasr_vm_wait_ready_simplified(.faasr, vm_details)
     
-    log_msg <- "VM started - GitHub Actions runner service is now available"
+    log_msg <- "Existing VM started - GitHub Actions runner service should be available"
     faasr_log(log_msg)
   }
   
@@ -104,11 +104,11 @@ faasr_execute_strategy_simple_start_end <- function(.faasr) {
   
   # STEP 3: Handle VM stop (only for last function)
   if (function_position$is_last) {
-    log_msg <- "Strategy 1: Terminating VM (runner service will auto-stop)"
+    log_msg <- "Strategy 1: Stopping existing VM instance (runner will auto-stop)"
     faasr_log(log_msg)
     cat(log_msg, "\n")
     
-    faasr_vm_terminate(.faasr)
+    faasr_vm_stop_simplified(.faasr)
   }
   
   return(.faasr)
@@ -175,96 +175,95 @@ faasr_execute_strategy_optimized <- function(.faasr) {
   stop("Strategy 3 (optimized) not yet implemented")
 }
 
-#' @name faasr_vm_start
-#' @title Start VM instance
+#' @name faasr_vm_start_simplified
+#' @title Start VM instance - simplified version without S3 state
 #' @param faasr FaaSr configuration list
 #' @export
-faasr_vm_start <- function(.faasr) {
+faasr_vm_start_simplified <- function(.faasr) {
   
   if (is.null(.faasr$VMConfig)) {
     stop("VMConfig not found in workflow configuration")
   }
   
   vm_config <- .faasr$VMConfig
-  faasr_validate_vm_config(vm_config)
+  faasr_validate_vm_config_existing(vm_config)
   
-  log_msg <- paste0("Starting VM: ", vm_config$Provider, " ", vm_config$InstanceType)
+  log_msg <- paste0("Starting existing VM: ", vm_config$Provider, " instance ", vm_config$InstanceId)
   faasr_log(log_msg)
   
-  # Dispatch to cloud provider - FIXED: Pass both vm_config AND faasr
+  # Dispatch to cloud provider
   vm_details <- switch(vm_config$Provider,
-                       "AWS" = faasr_aws_start_vm(vm_config, .faasr),
+                       "AWS" = faasr_aws_start_existing_vm(vm_config, .faasr),
                        stop(paste("Unsupported VM provider:", vm_config$Provider))
   )
   
-  # Store VM state for later cleanup
-  faasr_vm_put_state(.faasr, vm_details)
-  
-  log_msg <- paste0("VM started: ", vm_details$InstanceId)
+  log_msg <- paste0("VM start initiated: ", vm_details$InstanceId)
   faasr_log(log_msg)
   
   return(vm_details)
 }
 
-#' @name faasr_vm_terminate
-#' @title Terminate VM instance
+#' @name faasr_vm_stop_simplified
+#' @title Stop VM instance - simplified version without S3 state
 #' @param faasr FaaSr configuration list
 #' @export
-faasr_vm_terminate <- function(.faasr) {
+faasr_vm_stop_simplified <- function(.faasr) {
   
-  # Get VM state
-  vm_details <- faasr_vm_get_state(.faasr)
-  
-  if (is.null(vm_details)) {
-    log_msg <- "No VM state found - VM may already be terminated"
+  if (is.null(.faasr$VMConfig)) {
+    log_msg <- "No VMConfig found - skipping VM stop"
     faasr_log(log_msg)
     cat(log_msg, "\n")
     return(TRUE)
   }
   
-  log_msg <- paste0("Terminating VM: ", vm_details$InstanceId)
+  vm_config <- .faasr$VMConfig
+  
+  log_msg <- paste0("Stopping VM: ", vm_config$InstanceId)
   faasr_log(log_msg)
   
   # Dispatch to cloud provider
-  success <- switch(vm_details$Provider,
-                    "AWS" = faasr_aws_terminate_vm(vm_details, .faasr$VMConfig),
-                    stop(paste("Unsupported VM provider:", vm_details$Provider))
+  success <- switch(vm_config$Provider,
+                    "AWS" = faasr_aws_stop_existing_vm(vm_config),
+                    stop(paste("Unsupported VM provider:", vm_config$Provider))
   )
   
   if (success) {
-    faasr_vm_delete_state(.faasr)
-    log_msg <- paste0("VM terminated successfully: ", vm_details$InstanceId)
+    log_msg <- paste0("VM stop initiated successfully: ", vm_config$InstanceId)
     faasr_log(log_msg)
   }
   
   return(success)
 }
 
-#' @name faasr_vm_wait_ready
-#' @title Wait for VM to be ready
+#' @name faasr_vm_wait_ready_simplified
+#' @title Wait for VM to be ready - simplified version
 #' @param faasr FaaSr configuration list
 #' @param vm_details VM details from start operation
 #' @export
-faasr_vm_wait_ready <- function(.faasr, vm_details) {
+faasr_vm_wait_ready_simplified <- function(.faasr, vm_details) {
   
-  max_wait_time <- 300  # 5 minutes
-  check_interval <- 30  # 30 seconds
+  max_wait_time <- 180  # 3 minutes (reduced since existing instance starts faster)
+  check_interval <- 15  # 15 seconds
   start_time <- Sys.time()
   
-  log_msg <- "Waiting for VM to be ready..."
+  log_msg <- "Waiting for existing VM to be ready..."
   faasr_log(log_msg)
   cat(log_msg, "\n")
   
+  # For existing instances with auto-start runner, shorter wait time
   while (TRUE) {
     elapsed_time <- as.numeric(difftime(Sys.time(), start_time, units = "secs"))
     
     if (elapsed_time > max_wait_time) {
-      stop("VM failed to become ready within timeout period")
+      log_msg <- "VM wait timeout reached - proceeding (runner may auto-start)"
+      faasr_log(log_msg)
+      cat(log_msg, "\n")
+      break
     }
     
-    # Simple wait - in production you'd check actual VM status
-    if (elapsed_time > 120) {  # Wait at least 2 minutes
-      log_msg <- "VM should be ready"
+    # Shorter wait for existing instances
+    if (elapsed_time > 60) {  # Wait at least 1 minute
+      log_msg <- "VM should be ready - runner service auto-starting"
       faasr_log(log_msg)
       cat(log_msg, "\n")
       break
@@ -276,87 +275,23 @@ faasr_vm_wait_ready <- function(.faasr, vm_details) {
 }
 
 # ------------------------------------------------------------------------------
-# VM STATE MANAGEMENT (S3-based)
+# AWS-SPECIFIC VM FUNCTIONS - UPDATED FOR EXISTING INSTANCES
 # ------------------------------------------------------------------------------
 
-#' @name faasr_vm_put_state
-#' @title Store VM state in S3
+#' @name faasr_aws_start_existing_vm
+#' @title Start existing AWS EC2 instance (replaces faasr_aws_start_vm)
+#' @param vm_config VM configuration including InstanceId
 #' @param faasr FaaSr configuration list
-#' @param vm_details VM details to store
-#' @export
-faasr_vm_put_state <- function(.faasr, vm_details) {
-  
-  # Add metadata
-  vm_state <- list(
-    vm_details = vm_details,
-    workflow_id = .faasr$InvocationID,
-    strategy = faasr_get_vm_strategy(.faasr),
-    created_at = Sys.time(),
-    Provider = .faasr$VMConfig$Provider
-  )
-  
-  state_file <- paste0(.faasr$InvocationID, "_vm_state.json")
-  vm_json <- jsonlite::toJSON(vm_state, auto_unbox = TRUE, pretty = TRUE)
-  
-  temp_file <- tempfile(fileext = ".json")
-  writeLines(vm_json, temp_file)
-  
-  faasr_put_file(
-    remote_folder = "FaaSrVM",
-    remote_file = state_file,
-    local_file = basename(temp_file),
-    local_folder = dirname(temp_file)
-  )
-  
-  unlink(temp_file)
-}
-
-#' @name faasr_vm_get_state
-#' @title Retrieve VM state from S3
-#' @param faasr FaaSr configuration list
-#' @export
-faasr_vm_get_state <- function(.faasr) {
-  
-  state_file <- paste0(.faasr$InvocationID, "_vm_state.json")
-  temp_file <- tempfile(fileext = ".json")
-  
-  tryCatch({
-    faasr_get_file(
-      remote_folder = "FaaSrVM",
-      remote_file = state_file,
-      local_file = basename(temp_file),
-      local_folder = dirname(temp_file)
-    )
-    
-    vm_json <- readLines(temp_file)
-    vm_state <- jsonlite::fromJSON(paste(vm_json, collapse = "\n"))
-    unlink(temp_file)
-    
-    return(vm_state$vm_details)
-    
-  }, error = function(e) {
-    if (file.exists(temp_file)) unlink(temp_file)
-    return(NULL)
-  })
-}
-
-#' @name faasr_vm_delete_state
-#' @title Delete VM state from S3
-#' @param faasr FaaSr configuration list
-#' @export
-faasr_vm_delete_state <- function(.faasr) {
-  state_file <- paste0(.faasr$InvocationID, "_vm_state.json")
-  faasr_delete_file(remote_folder = "FaaSrVM", remote_file = state_file)
-}
-
-#' @name faasr_aws_start_vm
-#' @title Start AWS EC2 instance with FaaSr credential pattern
-#' @param vm_config VM configuration
 #' @importFrom paws.compute ec2
 #' @export
-faasr_aws_start_vm <- function(vm_config, faasr=NULL) {
+faasr_aws_start_existing_vm <- function(vm_config, faasr = NULL) {
   
-  # CORRECTED: Follow DataStore credential pattern - get from environment
+  # Validate required fields for existing instance
+  if (is.null(vm_config$InstanceId) || vm_config$InstanceId == "") {
+    stop("InstanceId is required in VMConfig for existing instance strategy")
+  }
+  
+  # Get AWS credentials from environment (following DataStore pattern)
   aws_access_key <- Sys.getenv(vm_config$AccessKey)
   aws_secret_key <- Sys.getenv(vm_config$SecretKey)
   
@@ -379,40 +314,40 @@ faasr_aws_start_vm <- function(vm_config, faasr=NULL) {
     )
   )
   
-  # Get workflow ID for tagging
-  workflow_id <- if (!is.null(.faasr)) .faasr$InvocationID else "unknown"
+  log_msg <- paste0("Starting existing instance: ", vm_config$InstanceId)
+  faasr_log(log_msg)
+  cat(log_msg, "\n")
   
-  # Start instance
-  result <- ec2$run_instances(list(
-    ImageId = vm_config$AMI_ID,
-    MinCount = 1L,
-    MaxCount = 1L,
-    InstanceType = vm_config$InstanceType,
-    KeyName = vm_config$KeyName %||% NULL,
-    SecurityGroupIds = vm_config$SecurityGroupIds %||% NULL,
-    SubnetId = vm_config$SubnetId %||% NULL,
-    TagSpecifications = list(
-      list(
-        ResourceType = "instance",
-        Tags = list(
-          list(Key = "Name", Value = "FaaSr-VM-AutoRunner"),
-          list(Key = "Purpose", Value = "FaaSr-GitHub-Runner"),
-          list(Key = "CreatedBy", Value = "FaaSr"),
-          list(Key = "WorkflowID", Value = workflow_id)
-        )
-      )
-    )
-  ))
-  
-  return(result$Instances[[1]])
+  # Start the existing instance
+  tryCatch({
+    result <- ec2$start_instances(list(InstanceIds = list(vm_config$InstanceId)))
+    
+    if (length(result$StartingInstances) > 0) {
+      instance_info <- result$StartingInstances[[1]]
+      log_msg <- paste0("Instance ", vm_config$InstanceId, " starting. Current state: ", 
+                        instance_info$CurrentState$Name)
+      faasr_log(log_msg)
+      cat(log_msg, "\n")
+      
+      # Return simplified instance details for compatibility
+      return(list(
+        InstanceId = vm_config$InstanceId,
+        State = instance_info$CurrentState$Name,
+        Provider = "AWS"
+      ))
+    } else {
+      stop("Failed to start instance - no instances returned")
+    }
+  }, error = function(e) {
+    stop(paste("Failed to start instance", vm_config$InstanceId, ":", e$message))
+  })
 }
 
-#' @name faasr_aws_terminate_vm
-#' @title Terminate AWS EC2 instance with FaaSr credential pattern
-#' @param vm_details VM details with instance information
-#' @param vm_config VM configuration for credentials
+#' @name faasr_aws_stop_existing_vm
+#' @title Stop existing AWS EC2 instance (replaces faasr_aws_terminate_vm)
+#' @param vm_config VM configuration including InstanceId
 #' @export
-faasr_aws_terminate_vm <- function(vm_details, vm_config) {
+faasr_aws_stop_existing_vm <- function(vm_config) {
   
   aws_access_key <- Sys.getenv(vm_config$AccessKey)
   aws_secret_key <- Sys.getenv(vm_config$SecretKey)
@@ -422,34 +357,49 @@ faasr_aws_terminate_vm <- function(vm_details, vm_config) {
                vm_config$AccessKey, "or", vm_config$SecretKey))
   }
   
-  # Extract region from instance placement
-  region <- vm_details$Placement$AvailabilityZone
-  # Remove availability zone suffix (e.g., "us-west-2a" -> "us-west-2")
-  region <- substr(region, 1, nchar(region) - 1)
-  
+  # Create EC2 client
   ec2 <- paws.compute::ec2(
     config = list(
       credentials = list(
         accessKeyId = aws_access_key,
         secretAccessKey = aws_secret_key
       ),
-      region = region
+      region = vm_config$Region
     )
   )
   
-  # Terminate instance
-  result <- ec2$terminate_instances(list(InstanceIds = list(vm_details$InstanceId)))
+  log_msg <- paste0("Stopping existing instance: ", vm_config$InstanceId)
+  faasr_log(log_msg)
+  cat(log_msg, "\n")
   
-  return(length(result$TerminatingInstances) > 0)
+  # Stop the instance (not terminate)
+  tryCatch({
+    result <- ec2$stop_instances(list(InstanceIds = list(vm_config$InstanceId)))
+    
+    if (length(result$StoppingInstances) > 0) {
+      log_msg <- paste0("Instance ", vm_config$InstanceId, " is stopping")
+      faasr_log(log_msg)
+      return(TRUE)
+    } else {
+      log_msg <- paste0("No instances were stopped for ID: ", vm_config$InstanceId)
+      faasr_log(log_msg)
+      return(FALSE)
+    }
+  }, error = function(e) {
+    log_msg <- paste("Failed to stop instance", vm_config$InstanceId, ":", e$message)
+    faasr_log(log_msg)
+    cat(log_msg, "\n")
+    return(FALSE)
+  })
 }
 
-#' @name faasr_validate_vm_config
-#' @title Validate VM configuration with FaaSr credential pattern
+#' @name faasr_validate_vm_config_existing
+#' @title Validate VM configuration for existing instance strategy
 #' @param vm_config VM configuration
 #' @export
-faasr_validate_vm_config <- function(vm_config) {
+faasr_validate_vm_config_existing <- function(vm_config) {
   
-  required_fields <- c("Provider", "InstanceType", "Region")
+  required_fields <- c("Provider", "Region", "InstanceId")
   
   for (field in required_fields) {
     if (is.null(vm_config[[field]]) || vm_config[[field]] == "") {
@@ -458,7 +408,7 @@ faasr_validate_vm_config <- function(vm_config) {
   }
   
   if (vm_config$Provider == "AWS") {
-    aws_required <- c("AMI_ID", "AccessKey", "SecretKey")
+    aws_required <- c("AccessKey", "SecretKey", "InstanceId")
     for (field in aws_required) {
       if (is.null(vm_config[[field]])) {
         stop(paste("Required AWS VM config field missing:", field))
