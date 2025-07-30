@@ -300,12 +300,14 @@ faasr_aws_start_existing_vm <- function(vm_config, faasr = NULL) {
   log_msg <- "Using AWS credentials from FaaSr credential replacement"
   faasr_log(log_msg)
   
-  # Create EC2 client with correct parameter names
+  # Create EC2 client using WORKING S3-style creds wrapper format
   ec2 <- paws.compute::ec2(
     config = list(
       credentials = list(
-        access_key_id = aws_access_key,      # FIXED: correct parameter name
-        secret_access_key = aws_secret_key   # FIXED: correct parameter name
+        creds = list(
+          access_key_id = aws_access_key,      # ✅ WORKING: S3-style format
+          secret_access_key = aws_secret_key   # ✅ WORKING: S3-style format
+        )
       ),
       region = vm_config$Region
     )
@@ -317,7 +319,7 @@ faasr_aws_start_existing_vm <- function(vm_config, faasr = NULL) {
   
   # Start the existing instance
   tryCatch({
-    result <- ec2$start_instances(InstanceIds = list(vm_config$InstanceId))  # FIXED: simplified parameter
+    result <- ec2$start_instances(InstanceIds = list(vm_config$InstanceId))
     
     if (length(result$StartingInstances) > 0) {
       instance_info <- result$StartingInstances[[1]]
@@ -356,12 +358,14 @@ faasr_aws_stop_existing_vm <- function(vm_config) {
     stop("AWS credentials not properly replaced - check SECRET_PAYLOAD and VMConfig setup")
   }
   
-  # Create EC2 client with correct parameter names
+  # Create EC2 client using WORKING S3-style creds wrapper format
   ec2 <- paws.compute::ec2(
     config = list(
       credentials = list(
-        access_key_id = aws_access_key,      # FIXED: correct parameter name
-        secret_access_key = aws_secret_key   # FIXED: correct parameter name
+        creds = list(
+          access_key_id = aws_access_key,      # ✅ WORKING: S3-style format
+          secret_access_key = aws_secret_key   # ✅ WORKING: S3-style format
+        )
       ),
       region = vm_config$Region
     )
@@ -373,7 +377,7 @@ faasr_aws_stop_existing_vm <- function(vm_config) {
   
   # Stop the instance (not terminate)
   tryCatch({
-    result <- ec2$stop_instances(InstanceIds = list(vm_config$InstanceId))  # FIXED: simplified parameter
+    result <- ec2$stop_instances(InstanceIds = list(vm_config$InstanceId))
     
     if (length(result$StoppingInstances) > 0) {
       log_msg <- paste0("Instance ", vm_config$InstanceId, " is stopping")
