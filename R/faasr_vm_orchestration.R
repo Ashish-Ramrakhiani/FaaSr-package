@@ -1,7 +1,7 @@
 #' @name faasr_vm_orchestrate
 #' @title Main VM orchestration entry point
 #' @description Handles VM lifecycle transparently based on strategy
-#' @param faasr FaaSr configuration list
+#' @param .faasr FaaSr configuration list
 #' @export
 faasr_vm_orchestrate <- function(.faasr) {
   
@@ -27,7 +27,7 @@ faasr_vm_orchestrate <- function(.faasr) {
 
 #' @name faasr_workflow_needs_vm
 #' @title Check if any function in workflow requires VM
-#' @param faasr FaaSr configuration list
+#' @param .faasr FaaSr configuration list
 #' @export
 faasr_workflow_needs_vm <- function(.faasr) {
   
@@ -42,7 +42,7 @@ faasr_workflow_needs_vm <- function(.faasr) {
 
 #' @name faasr_get_vm_strategy
 #' @title Get VM orchestration strategy from configuration
-#' @param faasr FaaSr configuration list
+#' @param .faasr FaaSr configuration list
 #' @export
 faasr_get_vm_strategy <- function(.faasr) {
   
@@ -59,7 +59,7 @@ faasr_get_vm_strategy <- function(.faasr) {
 
 #' @name faasr_execute_strategy_simple_start_end_fixed
 #' @title Execute Strategy 1: Fixed version using existing instance
-#' @param faasr FaaSr configuration list
+#' @param .faasr FaaSr configuration list
 #' @export
 faasr_execute_strategy_simple_start_end_fixed <- function(.faasr) {
   
@@ -116,7 +116,7 @@ faasr_execute_strategy_simple_start_end_fixed <- function(.faasr) {
 
 #' @name faasr_get_function_position_in_workflow
 #' @title Determine if function is first, last, or middle in workflow
-#' @param faasr FaaSr configuration list
+#' @param .faasr FaaSr configuration list
 #' @param current_function Name of current function
 #' @export
 faasr_get_function_position_in_workflow <- function(.faasr, current_function) {
@@ -153,7 +153,7 @@ faasr_get_function_position_in_workflow <- function(.faasr, current_function) {
 
 #' @name faasr_execute_regular_function
 #' @title Execute function without VM orchestration
-#' @param faasr FaaSr configuration list
+#' @param .faasr FaaSr configuration list
 #' @export
 faasr_execute_regular_function <- function(.faasr) {
   
@@ -177,7 +177,7 @@ faasr_execute_strategy_optimized <- function(.faasr) {
 
 #' @name faasr_vm_start_simplified
 #' @title Start VM instance - simplified version without S3 state
-#' @param faasr FaaSr configuration list
+#' @param .faasr FaaSr configuration list
 #' @export
 faasr_vm_start_simplified <- function(.faasr) {
   
@@ -205,7 +205,7 @@ faasr_vm_start_simplified <- function(.faasr) {
 
 #' @name faasr_vm_stop_simplified
 #' @title Stop VM instance - simplified version without S3 state
-#' @param faasr FaaSr configuration list
+#' @param .faasr FaaSr configuration list
 #' @export
 faasr_vm_stop_simplified <- function(.faasr) {
   
@@ -237,7 +237,7 @@ faasr_vm_stop_simplified <- function(.faasr) {
 
 #' @name faasr_vm_wait_ready_simplified
 #' @title Wait for VM to be ready - simplified version
-#' @param faasr FaaSr configuration list
+#' @param .faasr FaaSr configuration list
 #' @param vm_details VM details from start operation
 #' @export
 faasr_vm_wait_ready_simplified <- function(.faasr, vm_details) {
@@ -281,10 +281,10 @@ faasr_vm_wait_ready_simplified <- function(.faasr, vm_details) {
 #' @name faasr_aws_start_existing_vm
 #' @title Start existing AWS EC2 instance (replaces faasr_aws_start_vm)
 #' @param vm_config VM configuration including InstanceId
-#' @param faasr FaaSr configuration list
+#' @param .faasr FaaSr configuration list
 #' @importFrom paws.compute ec2
 #' @export
-faasr_aws_start_existing_vm <- function(vm_config, faasr = NULL) {
+faasr_aws_start_existing_vm <- function(vm_config, .faasr = NULL) {
   
   # Validate required fields for existing instance
   if (is.null(vm_config$InstanceId) || vm_config$InstanceId == "") {

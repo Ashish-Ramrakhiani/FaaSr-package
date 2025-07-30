@@ -7,7 +7,7 @@
 faasr_vm_orchestrate(.faasr)
 }
 \arguments{
-\item{faasr}{FaaSr configuration list}
+\item{.faasr}{FaaSr configuration list}
 }
 \description{
 Handles VM lifecycle transparently based on strategy

@@ -7,7 +7,7 @@
 faasr_get_vm_strategy(.faasr)
 }
 \arguments{
-\item{faasr}{FaaSr configuration list}
+\item{.faasr}{FaaSr configuration list}
 }
 \description{
 Get VM orchestration strategy from configuration

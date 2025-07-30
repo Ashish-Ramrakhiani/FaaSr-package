@@ -7,9 +7,9 @@
 faasr_get_function_position_in_workflow(.faasr, current_function)
 }
 \arguments{
-\item{current_function}{Name of current function}
+\item{.faasr}{FaaSr configuration list}
 
-\item{faasr}{FaaSr configuration list}
+\item{current_function}{Name of current function}
 }
 \description{
 Determine if function is first, last, or middle in workflow

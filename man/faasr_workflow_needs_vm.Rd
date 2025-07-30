@@ -7,7 +7,7 @@
 faasr_workflow_needs_vm(.faasr)
 }
 \arguments{
-\item{faasr}{FaaSr configuration list}
+\item{.faasr}{FaaSr configuration list}
 }
 \description{
 Check if any function in workflow requires VM

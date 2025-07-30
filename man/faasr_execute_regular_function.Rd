@@ -7,7 +7,7 @@
 faasr_execute_regular_function(.faasr)
 }
 \arguments{
-\item{faasr}{FaaSr configuration list}
+\item{.faasr}{FaaSr configuration list}
 }
 \description{
 Execute function without VM orchestration
