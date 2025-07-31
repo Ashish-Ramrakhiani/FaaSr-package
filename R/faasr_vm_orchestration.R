@@ -122,25 +122,45 @@ faasr_execute_strategy_simple_start_end_fixed <- function(.faasr) {
 faasr_get_function_position_in_workflow <- function(.faasr, current_function) {
   
   workflow <- .faasr$FunctionList
-  entry_point <- .faasr$FunctionInvoke
   
-  # Check if this is the entry point (first function)
-  is_first <- (current_function == entry_point)
+  # FIXED: Check if function has predecessors (incoming edges)
+  has_predecessors <- FALSE
+  for (func_name in names(workflow)) {
+    func_config <- workflow[[func_name]]
+    invoke_next <- func_config$InvokeNext
+    
+    if (!is.null(invoke_next)) {
+      # Handle both single string and array of strings
+      if (is.character(invoke_next)) {
+        if (current_function %in% invoke_next) {
+          has_predecessors <- TRUE
+          break
+        }
+      }
+    }
+  }
   
-  # Check if this is a terminal function (no InvokeNext or empty InvokeNext)
+  # FIXED: Check if function has successors (outgoing edges)
   current_config <- workflow[[current_function]]
-  has_next <- !is.null(current_config$InvokeNext) && length(current_config$InvokeNext) > 0
-  is_last <- !has_next
+  has_successors <- !is.null(current_config$InvokeNext) && length(current_config$InvokeNext) > 0
   
-  # Determine function type
-  if (is_first && is_last) {
+  # Determine function type based on predecessors and successors
+  if (!has_predecessors && !has_successors) {
     function_type <- "single"  # Only one function in workflow
-  } else if (is_first) {
-    function_type <- "first"
-  } else if (is_last) {
-    function_type <- "last"
+    is_first <- TRUE
+    is_last <- TRUE
+  } else if (!has_predecessors && has_successors) {
+    function_type <- "first"   # Entry point function
+    is_first <- TRUE
+    is_last <- FALSE
+  } else if (has_predecessors && !has_successors) {
+    function_type <- "last"    # Terminal function
+    is_first <- FALSE
+    is_last <- TRUE
   } else {
-    function_type <- "middle"
+    function_type <- "middle"  # Middle function
+    is_first <- FALSE
+    is_last <- FALSE
   }
   
   return(list(
@@ -236,42 +256,192 @@ faasr_vm_stop_simplified <- function(.faasr) {
 }
 
 #' @name faasr_vm_wait_ready_simplified
-#' @title Wait for VM to be ready - simplified version
+#' @title Wait for VM to be ready - improved with status verification
 #' @param .faasr FaaSr configuration list
 #' @param vm_details VM details from start operation
 #' @export
 faasr_vm_wait_ready_simplified <- function(.faasr, vm_details) {
   
-  max_wait_time <- 180  # 3 minutes (reduced since existing instance starts faster)
-  check_interval <- 15  # 15 seconds
+  max_wait_time <- 300  # 5 minutes total
+  check_interval <- 20  # Check every 20 seconds
   start_time <- Sys.time()
   
   log_msg <- "Waiting for existing VM to be ready..."
   faasr_log(log_msg)
   cat(log_msg, "\n")
   
-  # For existing instances with auto-start runner, shorter wait time
+  # Get VM config for status checking
+  vm_config <- .faasr$VMConfig
+  
   while (TRUE) {
     elapsed_time <- as.numeric(difftime(Sys.time(), start_time, units = "secs"))
     
+    # Timeout check
     if (elapsed_time > max_wait_time) {
-      log_msg <- "VM wait timeout reached - proceeding (runner may auto-start)"
+      log_msg <- "VM wait timeout reached - proceeding (runner may not be ready)"
       faasr_log(log_msg)
       cat(log_msg, "\n")
       break
     }
     
-    # Shorter wait for existing instances
-    if (elapsed_time > 60) {  # Wait at least 1 minute
-      log_msg <- "VM should be ready - runner service auto-starting"
-      faasr_log(log_msg)
-      cat(log_msg, "\n")
-      break
-    }
+    # Check actual VM status
+    tryCatch({
+      vm_status <- faasr_check_vm_status(vm_config)
+      
+      if (vm_status$instance_running && vm_status$status_checks_passed) {
+        # VM is running and healthy, now wait a bit more for GitHub runner service
+        log_msg <- paste0("VM is running and healthy after ", round(elapsed_time), " seconds")
+        faasr_log(log_msg)
+        cat(log_msg, "\n")
+        
+        # Additional wait for GitHub runner service to register (if we haven't waited long enough)
+        if (elapsed_time < 90) {
+          additional_wait <- 90 - elapsed_time
+          log_msg <- paste0("Waiting additional ", round(additional_wait), " seconds for GitHub runner service...")
+          faasr_log(log_msg)
+          cat(log_msg, "\n")
+          Sys.sleep(additional_wait)
+        }
+        
+        log_msg <- "VM and GitHub runner service should be ready"
+        faasr_log(log_msg)
+        cat(log_msg, "\n")
+        break
+      } else {
+        # VM not ready yet
+        status_msg <- paste0("VM Status - Running: ", vm_status$instance_running, 
+                             ", Status Checks: ", vm_status$status_checks_passed)
+        cat(".", status_msg, "\n")
+      }
+      
+    }, error = function(e) {
+      # If status check fails, continue waiting
+      cat(".", "Status check failed:", e$message, "\n")
+    })
     
-    cat(".")
     Sys.sleep(check_interval)
   }
+}
+
+#' @name faasr_vm_wait_stopped
+#' @title Wait for VM to be fully stopped
+#' @param vm_config VM configuration including InstanceId
+#' @export
+faasr_vm_wait_stopped <- function(vm_config) {
+  
+  max_wait_time <- 180  # 3 minutes for stopping
+  check_interval <- 15  # Check every 15 seconds
+  start_time <- Sys.time()
+  
+  log_msg <- "Waiting for VM to be fully stopped..."
+  faasr_log(log_msg)
+  cat(log_msg, "\n")
+  
+  while (TRUE) {
+    elapsed_time <- as.numeric(difftime(Sys.time(), start_time, units = "secs"))
+    
+    # Timeout check
+    if (elapsed_time > max_wait_time) {
+      log_msg <- "VM stop wait timeout reached - proceeding anyway"
+      faasr_log(log_msg)
+      cat(log_msg, "\n")
+      break
+    }
+    
+    # Check actual VM status
+    tryCatch({
+      vm_status <- faasr_check_vm_status(vm_config)
+      
+      if (!vm_status$instance_running) {
+        log_msg <- paste0("VM successfully stopped after ", round(elapsed_time), " seconds")
+        faasr_log(log_msg)
+        cat(log_msg, "\n")
+        break
+      } else {
+        cat(".", "VM still running, waiting for stop...\n")
+      }
+      
+    }, error = function(e) {
+      # If status check fails, continue waiting
+      cat(".", "Status check failed:", e$message, "\n")
+    })
+    
+    Sys.sleep(check_interval)
+  }
+}
+
+#' @name faasr_check_vm_status
+#' @title Check VM instance status using AWS API
+#' @param vm_config VM configuration including credentials and instance ID
+#' @return List with instance_running and status_checks_passed flags
+#' @export
+faasr_check_vm_status <- function(vm_config) {
+  
+  # Get AWS credentials (should already be replaced by faasr_replace_values)
+  aws_access_key <- vm_config$AccessKey
+  aws_secret_key <- vm_config$SecretKey
+  
+  if (is.null(aws_access_key) || is.null(aws_secret_key) || 
+      aws_access_key == "" || aws_secret_key == "" ||
+      aws_access_key == "VMCONFIG_ACCESS_KEY" || aws_secret_key == "VMCONFIG_SECRET_KEY") {
+    stop("AWS credentials not properly replaced - cannot check VM status")
+  }
+  
+  # Create EC2 client using working S3-style creds wrapper format
+  ec2 <- paws.compute::ec2(
+    config = list(
+      credentials = list(
+        creds = list(
+          access_key_id = aws_access_key,
+          secret_access_key = aws_secret_key
+        )
+      ),
+      region = vm_config$Region
+    )
+  )
+  
+  # Get instance status
+  result <- ec2$describe_instances(InstanceIds = list(vm_config$InstanceId))
+  
+  if (length(result$Reservations) == 0 || length(result$Reservations[[1]]$Instances) == 0) {
+    stop(paste("Instance not found:", vm_config$InstanceId))
+  }
+  
+  instance <- result$Reservations[[1]]$Instances[[1]]
+  instance_state <- instance$State$Name
+  
+  # Check if instance is running
+  instance_running <- (instance_state == "running")
+  
+  # Check system status (only if running)
+  status_checks_passed <- FALSE
+  if (instance_running) {
+    tryCatch({
+      # Get instance status checks
+      status_result <- ec2$describe_instance_status(InstanceIds = list(vm_config$InstanceId))
+      
+      if (length(status_result$InstanceStatuses) > 0) {
+        status_info <- status_result$InstanceStatuses[[1]]
+        instance_status <- status_info$InstanceStatus$Status
+        system_status <- status_info$SystemStatus$Status
+        
+        # Both instance and system status should be "ok"
+        status_checks_passed <- (instance_status == "ok" && system_status == "ok")
+      } else {
+        # No status information available yet (instance might be starting)
+        status_checks_passed <- FALSE
+      }
+    }, error = function(e) {
+      # If status check API fails, assume not ready
+      status_checks_passed <- FALSE
+    })
+  }
+  
+  return(list(
+    instance_running = instance_running,
+    status_checks_passed = status_checks_passed,
+    instance_state = instance_state
+  ))
 }
 
 #' @name faasr_aws_start_existing_vm
@@ -305,13 +475,32 @@ faasr_aws_start_existing_vm <- function(vm_config, faasr = NULL) {
     config = list(
       credentials = list(
         creds = list(
-          access_key_id = aws_access_key,      # ✅ WORKING: S3-style format
-          secret_access_key = aws_secret_key   # ✅ WORKING: S3-style format
+          access_key_id = aws_access_key,
+          secret_access_key = aws_secret_key
         )
       ),
       region = vm_config$Region
     )
   )
+  
+  # Check current instance state before attempting start
+  tryCatch({
+    current_status <- faasr_check_vm_status(vm_config)
+    if (current_status$instance_running) {
+      log_msg <- paste0("Instance ", vm_config$InstanceId, " is already running")
+      faasr_log(log_msg)
+      cat(log_msg, "\n")
+      return(list(
+        InstanceId = vm_config$InstanceId,
+        State = "running",
+        Provider = "AWS"
+      ))
+    }
+  }, error = function(e) {
+    log_msg <- paste0("Could not check current instance state: ", e$message)
+    faasr_log(log_msg)
+    cat(log_msg, "\n")
+  })
   
   log_msg <- paste0("Starting existing instance: ", vm_config$InstanceId)
   faasr_log(log_msg)
@@ -363,13 +552,28 @@ faasr_aws_stop_existing_vm <- function(vm_config) {
     config = list(
       credentials = list(
         creds = list(
-          access_key_id = aws_access_key,      # ✅ WORKING: S3-style format
-          secret_access_key = aws_secret_key   # ✅ WORKING: S3-style format
+          access_key_id = aws_access_key,
+          secret_access_key = aws_secret_key
         )
       ),
       region = vm_config$Region
     )
   )
+  
+  # Check current instance state before attempting stop
+  tryCatch({
+    current_status <- faasr_check_vm_status(vm_config)
+    if (!current_status$instance_running) {
+      log_msg <- paste0("Instance ", vm_config$InstanceId, " is already stopped")
+      faasr_log(log_msg)
+      cat(log_msg, "\n")
+      return(TRUE)
+    }
+  }, error = function(e) {
+    log_msg <- paste0("Could not check current instance state: ", e$message)
+    faasr_log(log_msg)
+    cat(log_msg, "\n")
+  })
   
   log_msg <- paste0("Stopping existing instance: ", vm_config$InstanceId)
   faasr_log(log_msg)
@@ -382,6 +586,10 @@ faasr_aws_stop_existing_vm <- function(vm_config) {
     if (length(result$StoppingInstances) > 0) {
       log_msg <- paste0("Instance ", vm_config$InstanceId, " is stopping")
       faasr_log(log_msg)
+      
+      # Wait for the instance to be fully stopped
+      faasr_vm_wait_stopped(vm_config)
+      
       return(TRUE)
     } else {
       log_msg <- paste0("No instances were stopped for ID: ", vm_config$InstanceId)

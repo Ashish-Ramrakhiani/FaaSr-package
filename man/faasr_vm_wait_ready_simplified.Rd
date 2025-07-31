@@ -2,7 +2,7 @@
 % Please edit documentation in R/faasr_vm_orchestration.R
 \name{faasr_vm_wait_ready_simplified}
 \alias{faasr_vm_wait_ready_simplified}
-\title{Wait for VM to be ready - simplified version}
+\title{Wait for VM to be ready - improved with status verification}
 \usage{
 faasr_vm_wait_ready_simplified(.faasr, vm_details)
 }
@@ -12,5 +12,5 @@ faasr_vm_wait_ready_simplified(.faasr, vm_details)
 \item{vm_details}{VM details from start operation}
 }
 \description{
-Wait for VM to be ready - simplified version
+Wait for VM to be ready - improved with status verification
 }
